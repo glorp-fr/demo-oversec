@@ -90,9 +90,6 @@ data "outscale_images" "oversec" {
    name = "image_names"
    values = ["*oversec*"]
   }
-  depends_on = [
-    terraform_data.packer_build_oversec
-  ]
 }
 
 
@@ -132,9 +129,6 @@ data "outscale_images" "http" {
    name = "image_names"
    values = ["*http*"]
   }
-  depends_on = [
-    terraform_data.packer_build_http
-  ]
 }
 
 
