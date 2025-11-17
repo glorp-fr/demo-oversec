@@ -152,9 +152,6 @@ resource "outscale_public_ip" "oversec_ip_net2_nat"{
 	key="Name"
 	value="oversec_ip_net2_nat"
   }
-    depends_on = [
-    terraform_data.oversec_net2_www_link
-  ]
 }
 
 
