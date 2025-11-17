@@ -30,92 +30,92 @@ resource "outscale_keypair" "kp-oversec" {
 
 #############################################################################################################################
 #
-# Lancement de Packer Oversec (avec vérification d'existence intégrée)
+# Lancement de Packer Oversec
 #
 #############################################################################################################################
 
-resource "terraform_data" "packer_oversec" {
-  input = local.trigger
+
+resource "terraform_data" "packer_init" {
+  input =  local.trigger
 
   provisioner "local-exec" {
     working_dir = "./"
-    environment = {
-      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
-    }
-    command = <<-EOT
-      # Vérifier si une image oversec existe déjà
-      IMAGE_COUNT=$(osc-cli ReadImages \
-        --Filters.ImageNames '["*oversec*"]' \
-        --profile default 2>/dev/null | grep -c "ImageId" || echo "0")
-      
-      if [ "$IMAGE_COUNT" -eq "0" ]; then
-        echo "Aucune image oversec trouvée. Lancement de Packer..."
-        packer init vm_oversec.pkr.hcl
-        packer build vm_oversec.pkr.hcl
-      else
-        echo "Image oversec existante détectée. Packer non exécuté."
-      fi
-    EOT
-    interpreter = ["bash", "-c"]
+    command = "packer init vm_oversec.pkr.hcl" 
   }
 }
 
-# Data source pour récupérer l'image oversec (existante ou nouvellement créée)
+
+resource "terraform_data" "packer_build_oversec" {
+  input = local.packer_init
+  
+  provisioner "local-exec" {
+    working_dir = "./"
+    environment = {
+    OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
+    OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
+
+    }
+    command = "packer build vm_oversec.pkr.hcl" 
+  
+  }
+}
+
+
 data "outscale_images" "oversec" {
   filter {
    name = "image_names"
    values = ["*oversec*"]
   }
   depends_on = [
-    terraform_data.packer_oversec
+    terraform_data.packer_build_oversec
   ]
 }
 
 
+
 #############################################################################################################################
 #
-# Lancement de Packer http (avec vérification d'existence intégrée)
+# Lancement de Packer http
 #
 #############################################################################################################################
 
-resource "terraform_data" "packer_http" {
-  input = local.trigger
+
+resource "terraform_data" "packer_init_http" {
+  input =  local.trigger
 
   provisioner "local-exec" {
     working_dir = "./"
-    environment = {
-      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
-    }
-    command = <<-EOT
-      # Vérifier si une image http existe déjà
-      IMAGE_COUNT=$(osc-cli ReadImages \
-        --Filters.ImageNames '["*http*"]' \
-        --profile default 2>/dev/null | grep -c "ImageId" || echo "0")
-      
-      if [ "$IMAGE_COUNT" -eq "0" ]; then
-        echo "Aucune image http trouvée. Lancement de Packer..."
-        packer init vm_http.pkr.hcl
-        packer build vm_http.pkr.hcl
-      else
-        echo "Image http existante détectée. Packer non exécuté."
-      fi
-    EOT
-    interpreter = ["bash", "-c"]
+    command = "packer init vm_http.pkr.hcl" 
   }
 }
 
-# Data source pour récupérer l'image http (existante ou nouvellement créée)
+
+resource "terraform_data" "packer_build_http" {
+  input = local.packer_init
+  
+  provisioner "local-exec" {
+    working_dir = "./"
+    environment = {
+    OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
+    OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
+
+    }
+    command = "packer build vm_http.pkr.hcl" 
+  
+  }
+}
+
+
 data "outscale_images" "http" {
   filter {
    name = "image_names"
    values = ["*http*"]
   }
   depends_on = [
-    terraform_data.packer_http
+    terraform_data.packer_build_http
   ]
 }
+
 
 
 #############################################################################################################################
@@ -181,15 +181,22 @@ resource "outscale_vm" "oversec_net2_sn1_vm1" {
     ] 
 }
 
+#############################################################################################################################
+#
+# VMs  NET 2 = http server
+#
+#############################################################################################################################
+
+
 resource "outscale_vm" "oversec_net2_sn2_vm2" {
     image_id                =  tolist(data.outscale_images.http.images)[0].image_id
     vm_type                  = "tinav6.c1r1p2" 
     keypair_name             = local.keypair_name
     subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
-    security_group_ids = [outscale_security_group.oversec_net2_sn1_sg.security_group_id]
+    security_group_ids = [outscale_security_group.oversec_net2_sn2_sg.security_group_id]
     tags {
         key   = "Name"
-        value = "oversec_net2-sn1_http"
+        value = "oversec_net2-sn2_http"
     }
     user_data                = base64encode(<<EOF
     <CONFIGURATION>
