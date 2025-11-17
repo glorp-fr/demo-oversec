@@ -3,7 +3,7 @@ locals {
   trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
   packer_init_oversec = terraform_data.packer_init_oversec.output
   packer_init_http = terraform_data.packer_init_http.output
-  omi_delete = terraform_data.packer_build.output
+  omi_delete = terraform_data.packer_build_oversec.output
   keypair_name = "kp-oversec"
 }
 
