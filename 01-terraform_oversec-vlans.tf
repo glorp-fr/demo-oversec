@@ -136,7 +136,7 @@ resource "outscale_route_table" "oversec_net2_sn1_rt" {
 resource "outscale_route" "oversec_net2_rt_def" {
   destination_ip_range = "0.0.0.0/0"
   route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
-  gateway_id = outscale_nat_service.oversec_net2_www.internet_service_id
+  gateway_id = outscale_internet_service.oversec_net2_www.internet_service_id
 }
 
 
