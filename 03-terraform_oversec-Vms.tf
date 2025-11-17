@@ -3,7 +3,7 @@
 locals {
   trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
   packer_init = terraform_data.packer_init.output
-  omi_delete = terraform_data.packer_build.output
+  omi_delete = terraform_data.packer_build_oversec.output
   keypair_name = "kp-oversec"
 }
 
@@ -146,7 +146,7 @@ resource "outscale_vm" "oversec_net1_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build
+    terraform_data.packer_build_oversec
     ] 
 }
 
@@ -188,7 +188,7 @@ resource "outscale_vm" "oversec_net2_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build
+    terraform_data.packer_build_oversec
     ] 
 }
 
@@ -208,7 +208,7 @@ resource "outscale_vm" "oversec_net2_sn2_vm2" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build
+    terraform_data.packer_build_http
     ] 
 }
 
@@ -235,7 +235,7 @@ resource "outscale_vm" "oversec_net3_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build
+    terraform_data.packer_build_http
     ] 
 }
 
