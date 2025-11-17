@@ -1,0 +1,29 @@
+---
+- name: Install
+  hosts: default
+  gather_facts: true
+  tasks:
+    - name: dl oversec sources
+      ansible.builtin.shell:  wget https://unified-mgmt-alpha.stormshield.eu/agent-download/downloads/mesh-installer-headless-linux-amd64-0.0.37-beta.tar.gz
+    - name: untar oversec
+      ansible.builtin.shell: tar xvf mesh-installer-headless-linux-amd64-0.0.37-beta.tar.gz
+    - name: Upgrade packages
+      ansible.builtin.apt:
+        force_apt_get: true
+        update_cache: true
+        upgrade: true
+        cache_valid_time: 3600
+      become: true
+    - name: Install local-all
+      ansible.builtin.apt:
+        name:
+          - locales-all
+        state: present
+      become: true
+    #- name: Install oversec
+    #  ansible.builtin.apt:
+    #    name:
+    #      - oversec
+    #    state: present
+    #  become: true
+
