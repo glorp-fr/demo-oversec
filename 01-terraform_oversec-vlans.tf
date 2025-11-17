@@ -175,7 +175,7 @@ resource "outscale_route" "oversec_net2_rt_def_priv" {
 #Attachement route table à subnet private
 resource "outscale_route_table_link" "oversec_net2_priv_rtl" {
     subnet_id      = outscale_subnet.oversec_net2_sn2.subnet_id
-    route_table_id = outscale_route_table.oversec_net2_rt_def_priv.route_table_id
+    route_table_id = outscale_route_table.oversec_net2_sn2_rt.route_table_id
 }
 
 #############################################################################################################################
