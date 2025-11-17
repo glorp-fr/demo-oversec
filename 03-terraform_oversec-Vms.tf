@@ -1,7 +1,9 @@
+
 locals {
   trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
+  packer_init = terraform_data.packer_init.output
+  omi_delete = terraform_data.packer_build.output
   keypair_name = "kp-oversec"
-  # Variables supprimées car non nécessaires avec l'approche conditionnelle
 }
 
 
@@ -35,7 +37,7 @@ resource "outscale_keypair" "kp-oversec" {
 #############################################################################################################################
 
 
-resource "terraform_data" "packer_init" {
+resource "terraform_data" "packer_init_oversec" {
   input =  local.trigger
 
   provisioner "local-exec" {
@@ -46,7 +48,7 @@ resource "terraform_data" "packer_init" {
 
 
 resource "terraform_data" "packer_build_oversec" {
-  input = local.packer_init
+  input = local.packer_init_oversec
   
   provisioner "local-exec" {
     working_dir = "./"
