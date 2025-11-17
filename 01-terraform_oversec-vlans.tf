@@ -87,7 +87,7 @@ resource "outscale_net" "oversec_net2_net" {
     }
 }
 
-#Créarion des subnets
+#Création des subnets
 resource "outscale_subnet" "oversec_net2_sn1" {
     net_id = outscale_net.oversec_net2_net.net_id
     ip_range = "10.2.1.0/24"
@@ -118,6 +118,7 @@ resource "outscale_internet_service" "oversec_net2_www" {
 resource "outscale_internet_service_link" "oversec_net2_www_link" {
   internet_service_id = outscale_internet_service.oversec_net2_www.internet_service_id
   net_id = outscale_net.oversec_net2_net.net_id
+  
 }
 
 
@@ -134,6 +135,9 @@ resource "outscale_route" "oversec_net2_rt_def" {
   destination_ip_range = "0.0.0.0/0"
   route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
   gateway_id = outscale_nat_service.oversec_net2_nat.nat_service_id
+  depends_on = [
+    terraform_data.oversec_net2_www_link
+  ]
 }
 #Attachement table de routage à subnet public
 resource "outscale_route_table_link" "oversec_net2_rtl" {
@@ -148,7 +152,11 @@ resource "outscale_public_ip" "oversec_ip_net2_nat"{
 	key="Name"
 	value="oversec_ip_net2_nat"
   }
+    depends_on = [
+    terraform_data.oversec_net2_www_link
+  ]
 }
+
 
 #NAT GATEWAY
 resource "outscale_nat_service" "oversec_net2_nat" {
