@@ -35,7 +35,7 @@ source "outscale-bsu" "debian_12" {
   ssh_interface = "public_ip"
   #ssh_keypair_name = var.keypair_name
   source_omi = var.omi_source
-  omi_name = "deb12_http-${local.timestamp}"
+  omi_name = "deb12_http"
   #ssh_private_key_file = "./kp-oversec.pem"
   launch_block_device_mappings {
       delete_on_vm_deletion = true
