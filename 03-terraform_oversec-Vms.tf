@@ -1,7 +1,8 @@
 
 locals {
   trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
-  packer_init = terraform_data.packer_init.output
+  packer_init_oversec = terraform_data.packer_init_oversec.output
+  packer_init_http = terraform_data.packer_init_http.output
   omi_delete = terraform_data.packer_build.output
   keypair_name = "kp-oversec"
 }
@@ -93,7 +94,7 @@ resource "terraform_data" "packer_init_http" {
 
 
 resource "terraform_data" "packer_build_http" {
-  input = local.packer_init
+  input = local.packer_init_http
   
   provisioner "local-exec" {
     working_dir = "./"
