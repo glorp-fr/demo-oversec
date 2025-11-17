@@ -30,27 +30,51 @@ resource "outscale_keypair" "kp-oversec" {
 
 #############################################################################################################################
 #
-# Vérification des images existantes
+# Vérification des images existantes avec gestion des erreurs
 #
 #############################################################################################################################
 
-data "outscale_images" "existing_oversec" {
-  filter {
-   name = "image_names"
-   values = ["*oversec*"]
+# Script pour vérifier l'existence des images
+resource "terraform_data" "check_oversec_image" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      if outscale-cli ReadImages --Filters.ImageNames '[*oversec*]' --profile default 2>/dev/null | grep -q "ImageId"; then
+        echo "true" > ${path.module}/.oversec_exists
+      else
+        echo "false" > ${path.module}/.oversec_exists
+      fi
+    EOT
+    interpreter = ["bash", "-c"]
   }
 }
 
-data "outscale_images" "existing_http" {
-  filter {
-   name = "image_names"
-   values = ["*http*"]
+resource "terraform_data" "check_http_image" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      if outscale-cli ReadImages --Filters.ImageNames '[*http*]' --profile default 2>/dev/null | grep -q "ImageId"; then
+        echo "true" > ${path.module}/.http_exists
+      else
+        echo "false" > ${path.module}/.http_exists
+      fi
+    EOT
+    interpreter = ["bash", "-c"]
   }
+}
+
+# Lecture des fichiers pour déterminer si les images existent
+data "local_file" "oversec_check" {
+  filename = "${path.module}/.oversec_exists"
+  depends_on = [terraform_data.check_oversec_image]
+}
+
+data "local_file" "http_check" {
+  filename = "${path.module}/.http_exists"
+  depends_on = [terraform_data.check_http_image]
 }
 
 locals {
-  oversec_image_exists = length(data.outscale_images.existing_oversec.images) > 0
-  http_image_exists = length(data.outscale_images.existing_http.images) > 0
+  oversec_image_exists = trimspace(data.local_file.oversec_check.content) == "true"
+  http_image_exists = trimspace(data.local_file.http_check.content) == "true"
 }
 
 
@@ -61,7 +85,7 @@ locals {
 #############################################################################################################################
 
 resource "terraform_data" "packer_init_oversec" {
-  count = local.oversec_image_exists ? 0 : 1
+  count = !local.oversec_image_exists ? 1 : 0
   input = local.trigger
 
   provisioner "local-exec" {
@@ -71,7 +95,7 @@ resource "terraform_data" "packer_init_oversec" {
 }
 
 resource "terraform_data" "packer_build_oversec" {
-  count = local.oversec_image_exists ? 0 : 1
+  count = !local.oversec_image_exists ? 1 : 0
   input = length(terraform_data.packer_init_oversec) > 0 ? terraform_data.packer_init_oversec[0].output : null
   
   provisioner "local-exec" {
@@ -90,6 +114,9 @@ data "outscale_images" "oversec" {
    name = "image_names"
    values = ["*oversec*"]
   }
+  depends_on = [
+    terraform_data.packer_build_oversec
+  ]
 }
 
 
@@ -100,7 +127,7 @@ data "outscale_images" "oversec" {
 #############################################################################################################################
 
 resource "terraform_data" "packer_init_http" {
-  count = local.http_image_exists ? 0 : 1
+  count = !local.http_image_exists ? 1 : 0
   input = local.trigger
 
   provisioner "local-exec" {
@@ -110,7 +137,7 @@ resource "terraform_data" "packer_init_http" {
 }
 
 resource "terraform_data" "packer_build_http" {
-  count = local.http_image_exists ? 0 : 1
+  count = !local.http_image_exists ? 1 : 0
   input = length(terraform_data.packer_init_http) > 0 ? terraform_data.packer_init_http[0].output : null
   
   provisioner "local-exec" {
@@ -129,6 +156,9 @@ data "outscale_images" "http" {
    name = "image_names"
    values = ["*http*"]
   }
+  depends_on = [
+    terraform_data.packer_build_http
+  ]
 }
 
 
