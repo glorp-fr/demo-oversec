@@ -30,81 +30,34 @@ resource "outscale_keypair" "kp-oversec" {
 
 #############################################################################################################################
 #
-# Vérification des images existantes avec gestion des erreurs
+# Lancement de Packer Oversec (avec vérification d'existence intégrée)
 #
 #############################################################################################################################
 
-# Script pour vérifier l'existence des images
-resource "terraform_data" "check_oversec_image" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      if outscale-cli ReadImages --Filters.ImageNames '[*oversec*]' --profile default 2>/dev/null | grep -q "ImageId"; then
-        echo "true" > ${path.module}/.oversec_exists
-      else
-        echo "false" > ${path.module}/.oversec_exists
-      fi
-    EOT
-    interpreter = ["bash", "-c"]
-  }
-}
-
-resource "terraform_data" "check_http_image" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      if outscale-cli ReadImages --Filters.ImageNames '[*http*]' --profile default 2>/dev/null | grep -q "ImageId"; then
-        echo "true" > ${path.module}/.http_exists
-      else
-        echo "false" > ${path.module}/.http_exists
-      fi
-    EOT
-    interpreter = ["bash", "-c"]
-  }
-}
-
-# Lecture des fichiers pour déterminer si les images existent
-data "local_file" "oversec_check" {
-  filename = "${path.module}/.oversec_exists"
-  depends_on = [terraform_data.check_oversec_image]
-}
-
-data "local_file" "http_check" {
-  filename = "${path.module}/.http_exists"
-  depends_on = [terraform_data.check_http_image]
-}
-
-locals {
-  oversec_image_exists = trimspace(data.local_file.oversec_check.content) == "true"
-  http_image_exists = trimspace(data.local_file.http_check.content) == "true"
-}
-
-
-#############################################################################################################################
-#
-# Lancement de Packer Oversec (uniquement si l'image n'existe pas)
-#
-#############################################################################################################################
-
-resource "terraform_data" "packer_init_oversec" {
-  count = !local.oversec_image_exists ? 1 : 0
+resource "terraform_data" "packer_oversec" {
   input = local.trigger
 
-  provisioner "local-exec" {
-    working_dir = "./"
-    command = "packer init vm_oversec.pkr.hcl" 
-  }
-}
-
-resource "terraform_data" "packer_build_oversec" {
-  count = !local.oversec_image_exists ? 1 : 0
-  input = length(terraform_data.packer_init_oversec) > 0 ? terraform_data.packer_init_oversec[0].output : null
-  
   provisioner "local-exec" {
     working_dir = "./"
     environment = {
       OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
       OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
     }
-    command = "packer build vm_oversec.pkr.hcl" 
+    command = <<-EOT
+      # Vérifier si une image oversec existe déjà
+      IMAGE_COUNT=$(osc-cli ReadImages \
+        --Filters.ImageNames '["*oversec*"]' \
+        --profile default 2>/dev/null | grep -c "ImageId" || echo "0")
+      
+      if [ "$IMAGE_COUNT" -eq "0" ]; then
+        echo "Aucune image oversec trouvée. Lancement de Packer..."
+        packer init vm_oversec.pkr.hcl
+        packer build vm_oversec.pkr.hcl
+      else
+        echo "Image oversec existante détectée. Packer non exécuté."
+      fi
+    EOT
+    interpreter = ["bash", "-c"]
   }
 }
 
@@ -115,38 +68,41 @@ data "outscale_images" "oversec" {
    values = ["*oversec*"]
   }
   depends_on = [
-    terraform_data.packer_build_oversec
+    terraform_data.packer_oversec
   ]
 }
 
 
 #############################################################################################################################
 #
-# Lancement de Packer http (uniquement si l'image n'existe pas)
+# Lancement de Packer http (avec vérification d'existence intégrée)
 #
 #############################################################################################################################
 
-resource "terraform_data" "packer_init_http" {
-  count = !local.http_image_exists ? 1 : 0
+resource "terraform_data" "packer_http" {
   input = local.trigger
 
-  provisioner "local-exec" {
-    working_dir = "./"
-    command = "packer init vm_http.pkr.hcl" 
-  }
-}
-
-resource "terraform_data" "packer_build_http" {
-  count = !local.http_image_exists ? 1 : 0
-  input = length(terraform_data.packer_init_http) > 0 ? terraform_data.packer_init_http[0].output : null
-  
   provisioner "local-exec" {
     working_dir = "./"
     environment = {
       OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
       OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
     }
-    command = "packer build vm_http.pkr.hcl" 
+    command = <<-EOT
+      # Vérifier si une image http existe déjà
+      IMAGE_COUNT=$(osc-cli ReadImages \
+        --Filters.ImageNames '["*http*"]' \
+        --profile default 2>/dev/null | grep -c "ImageId" || echo "0")
+      
+      if [ "$IMAGE_COUNT" -eq "0" ]; then
+        echo "Aucune image http trouvée. Lancement de Packer..."
+        packer init vm_http.pkr.hcl
+        packer build vm_http.pkr.hcl
+      else
+        echo "Image http existante détectée. Packer non exécuté."
+      fi
+    EOT
+    interpreter = ["bash", "-c"]
   }
 }
 
@@ -157,7 +113,7 @@ data "outscale_images" "http" {
    values = ["*http*"]
   }
   depends_on = [
-    terraform_data.packer_build_http
+    terraform_data.packer_http
   ]
 }
 
