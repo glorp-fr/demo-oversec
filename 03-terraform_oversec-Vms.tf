@@ -30,16 +30,41 @@ resource "outscale_keypair" "kp-oversec" {
   public_key = tls_private_key.kp-oversec.public_key_openssh
 }
 
+#############################################################################################################################
+#
+# Vérification des images existantes
+#
+#############################################################################################################################
+
+data "outscale_images" "existing_oversec" {
+  filter {
+   name = "image_names"
+   values = ["*oversec*"]
+  }
+}
+
+data "outscale_images" "existing_http" {
+  filter {
+   name = "image_names"
+   values = ["*http*"]
+  }
+}
+
+locals {
+  oversec_image_exists = length(data.outscale_images.existing_oversec.images) > 0
+  http_image_exists = length(data.outscale_images.existing_http.images) > 0
+}
+
 
 #############################################################################################################################
 #
-# Lancement de Packer Oversec
+# Lancement de Packer Oversec (uniquement si l'image n'existe pas)
 #
 #############################################################################################################################
 
-
-resource "terraform_data" "packer_init" {
-  input =  local.trigger
+resource "terraform_data" "packer_init_oversec" {
+  count = local.oversec_image_exists ? 0 : 1
+  input = local.trigger
 
   provisioner "local-exec" {
     working_dir = "./"
@@ -47,23 +72,21 @@ resource "terraform_data" "packer_init" {
   }
 }
 
-
 resource "terraform_data" "packer_build_oversec" {
-  input = local.packer_init
+  count = local.oversec_image_exists ? 0 : 1
+  input = local.oversec_image_exists ? null : terraform_data.packer_init_oversec[0].output
   
   provisioner "local-exec" {
     working_dir = "./"
     environment = {
-    OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-    OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
-
+      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
+      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
     }
     command = "packer build vm_oversec.pkr.hcl" 
-  
   }
 }
 
-
+# Data source pour récupérer l'image oversec (existante ou nouvellement créée)
 data "outscale_images" "oversec" {
   filter {
    name = "image_names"
@@ -75,16 +98,15 @@ data "outscale_images" "oversec" {
 }
 
 
-
 #############################################################################################################################
 #
-# Lancement de Packer http
+# Lancement de Packer http (uniquement si l'image n'existe pas)
 #
 #############################################################################################################################
-
 
 resource "terraform_data" "packer_init_http" {
-  input =  local.trigger
+  count = local.http_image_exists ? 0 : 1
+  input = local.trigger
 
   provisioner "local-exec" {
     working_dir = "./"
@@ -92,23 +114,21 @@ resource "terraform_data" "packer_init_http" {
   }
 }
 
-
 resource "terraform_data" "packer_build_http" {
-  input = local.packer_init
+  count = local.http_image_exists ? 0 : 1
+  input = local.http_image_exists ? null : terraform_data.packer_init_http[0].output
   
   provisioner "local-exec" {
     working_dir = "./"
     environment = {
-    OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-    OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
-
+      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
+      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
     }
     command = "packer build vm_http.pkr.hcl" 
-  
   }
 }
 
-
+# Data source pour récupérer l'image http (existante ou nouvellement créée)
 data "outscale_images" "http" {
   filter {
    name = "image_names"
@@ -118,6 +138,7 @@ data "outscale_images" "http" {
     terraform_data.packer_build_http
   ]
 }
+
 
 
 
