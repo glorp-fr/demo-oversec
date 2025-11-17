@@ -1,247 +1,221 @@
-locals {
-  trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
-  keypair_name = "kp-oversec"
-  # Variables supprimées car non nécessaires avec l'approche conditionnelle
-}
-
-
-#############################################################################################################################
-#
-# Keypair
-#
-#############################################################################################################################
-
-resource "tls_private_key" "kp-oversec" {
-  algorithm = "RSA"
-  rsa_bits  = "2048"
-}
-
-resource "local_file" "kp-oversec" {
-  filename        = "${path.module}/kp-oversec.pem"
-  content         = tls_private_key.kp-oversec.private_key_pem
-  file_permission = "0600"
-}
-
-resource "outscale_keypair" "kp-oversec" {
-  keypair_name = "kp-oversec"
-  public_key = tls_private_key.kp-oversec.public_key_openssh
-}
-
-
-#############################################################################################################################
-#
-# Vérification des images existantes
-#
-#############################################################################################################################
-
-data "outscale_images" "existing_oversec" {
-  filter {
-   name = "image_names"
-   values = ["*oversec*"]
-  }
-}
-
-data "outscale_images" "existing_http" {
-  filter {
-   name = "image_names"
-   values = ["*http*"]
-  }
-}
-
-locals {
-  oversec_image_exists = length(data.outscale_images.existing_oversec.images) > 0
-  http_image_exists = length(data.outscale_images.existing_http.images) > 0
-}
-
-
-#############################################################################################################################
-#
-# Lancement de Packer Oversec (uniquement si l'image n'existe pas)
-#
-#############################################################################################################################
-
-resource "terraform_data" "packer_init_oversec" {
-  count = local.oversec_image_exists ? 0 : 1
-  input = local.trigger
-
-  provisioner "local-exec" {
-    working_dir = "./"
-    command = "packer init vm_oversec.pkr.hcl" 
-  }
-}
-
-resource "terraform_data" "packer_build_oversec" {
-  count = local.oversec_image_exists ? 0 : 1
-  input = length(terraform_data.packer_init_oversec) > 0 ? terraform_data.packer_init_oversec[0].output : null
-  
-  provisioner "local-exec" {
-    working_dir = "./"
-    environment = {
-      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
+terraform {
+  required_providers {
+    outscale = {
+      source = "outscale/outscale"
+      version = "1.2.1"
     }
-    command = "packer build vm_oversec.pkr.hcl" 
   }
+}  
+
+provider "outscale" {
+  access_key_id = var.access_key_id
+  secret_key_id = var.secret_key_id
+  region = var.region
 }
 
-# Data source pour récupérer l'image oversec (existante ou nouvellement créée)
-data "outscale_images" "oversec" {
-  filter {
-   name = "image_names"
-   values = ["*oversec*"]
-  }
-  depends_on = [
-    terraform_data.packer_build_oversec
-  ]
-}
+output "path" { value= path.module}
 
 
-#############################################################################################################################
+
+##############################################################################################################################
 #
-# Lancement de Packer http (uniquement si l'image n'existe pas)
+# NET 1 : Client Oversec
 #
-#############################################################################################################################
+##############################################################################################################################
 
-resource "terraform_data" "packer_init_http" {
-  count = local.http_image_exists ? 0 : 1
-  input = local.trigger
-
-  provisioner "local-exec" {
-    working_dir = "./"
-    command = "packer init vm_http.pkr.hcl" 
-  }
-}
-
-resource "terraform_data" "packer_build_http" {
-  count = local.http_image_exists ? 0 : 1
-  input = length(terraform_data.packer_init_http) > 0 ? terraform_data.packer_init_http[0].output : null
-  
-  provisioner "local-exec" {
-    working_dir = "./"
-    environment = {
-      OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
-      OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
-    }
-    command = "packer build vm_http.pkr.hcl" 
-  }
-}
-
-# Data source pour récupérer l'image http (existante ou nouvellement créée)
-data "outscale_images" "http" {
-  filter {
-   name = "image_names"
-   values = ["*http*"]
-  }
-  depends_on = [
-    terraform_data.packer_build_http
-  ]
-}
-
-
-#############################################################################################################################
-#
-# VM NET1 = Client Oversec
-#
-#############################################################################################################################
-
-resource "outscale_vm" "oversec_net1_sn1_vm1" {
-    image_id                 = tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav6.c1r2p2" 
-    keypair_name             = local.keypair_name
-    subnet_id = outscale_subnet.oversec_net1_sn1.subnet_id
-    security_group_ids = [outscale_security_group.oversec_net1_sn1_sg.security_group_id]
+resource "outscale_net" "oversec_net1_net" {
+    ip_range = "10.1.0.0/16"
     tags {
-        key   = "Name"
-        value = "oversec_net1-sn1_vm1"
+        key="Name"
+        value="oversec_net1_Client"
     }
-    user_data                = base64encode(<<EOF
-    <CONFIGURATION>
-    EOF
-    )
-    depends_on = [
-      data.outscale_images.oversec
-    ] 
 }
 
-resource "outscale_public_ip" "oversec_net1_sn1_vm1_ip"{
+resource "outscale_subnet" "oversec_net1_sn1" {
+    net_id = outscale_net.oversec_net1_net.net_id
+    ip_range = "10.1.1.0/24"
+    tags {
+        key="Name"
+        value="oversec_net1_sn1"
+    }
+}
+
+#Internet service
+resource "outscale_internet_service" "oversec_net1_www" {
 	tags {
 	key="Name"
-	value="oversec_net1_sn1_vm1_ip"
+	value="oversec_net1_www"
   }
 }
 
-resource "outscale_public_ip_link" "oversec_net1_sn1_vm1_ipl" {
-    vm_id     = outscale_vm.oversec_net1_sn1_vm1.vm_id
-    public_ip = outscale_public_ip.oversec_net1_sn1_vm1_ip.public_ip
+resource "outscale_internet_service_link" "oversec_net1_www_link" {
+  internet_service_id = outscale_internet_service.oversec_net1_www.internet_service_id
+  net_id = outscale_net.oversec_net1_net.net_id
 }
 
+resource "outscale_route_table" "oversec_net1_sn1_rt" {
+  net_id = outscale_net.oversec_net1_net.net_id
+  tags {
+    key="Name"
+    value="oversec_net1_sn1_rt"
+  }
+}
+
+resource "outscale_route" "oversec_net1_rt_def" {
+  destination_ip_range = "0.0.0.0/0"
+  route_table_id = outscale_route_table.oversec_net1_sn1_rt.route_table_id
+  gateway_id = outscale_internet_service.oversec_net1_www.internet_service_id
+}
+
+resource "outscale_route_table_link" "oversec_net1_rtl" {
+    subnet_id      = outscale_subnet.oversec_net1_sn1.subnet_id
+    route_table_id = outscale_route_table.oversec_net1_sn1_rt.route_table_id
+}
 
 #############################################################################################################################
 #
-# VMs  NET 2 = Oversec Relay
+# NET 2 Site prod publique
 #
-#############################################################################################################################
+##############################################################################################################################
 
-resource "outscale_vm" "oversec_net2_sn1_vm1" {
-    image_id                = tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav6.c1r2p2"
-    keypair_name             = local.keypair_name
-    subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
-    security_group_ids = [outscale_security_group.oversec_net2_sn1_sg.security_group_id]
+#Création du NET
+resource "outscale_net" "oversec_net2_net" {
+    ip_range = "10.2.0.0/16"
     tags {
-        key   = "Name"
-        value = "oversec_net2-sn1_Relay"
+        key="Name"
+        value="oversec_net2_Prod_Public"
     }
-    user_data                = base64encode(<<EOF
-    <CONFIGURATION>
-    EOF
-    )
-    depends_on = [
-      data.outscale_images.oversec
-    ] 
 }
 
-resource "outscale_vm" "oversec_net2_sn2_vm2" {
-    image_id                =  tolist(data.outscale_images.http.images)[0].image_id
-    vm_type                  = "tinav6.c1r1p2" 
-    keypair_name             = local.keypair_name
-    subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
-    security_group_ids = [outscale_security_group.oversec_net2_sn1_sg.security_group_id]
+#Création des subnets
+resource "outscale_subnet" "oversec_net2_sn1" {
+    net_id = outscale_net.oversec_net2_net.net_id
+    ip_range = "10.2.1.0/24"
     tags {
-        key   = "Name"
-        value = "oversec_net2-sn1_http"
+        key="Name"
+        value="oversec_net2_public"
     }
-    user_data                = base64encode(<<EOF
-    <CONFIGURATION>
-    EOF
-    )
-    depends_on = [
-      data.outscale_images.http
-    ] 
 }
 
+resource "outscale_subnet" "oversec_net2_sn2" {
+    net_id = outscale_net.oversec_net2_net.net_id
+    ip_range = "10.2.2.0/24"
+    tags {
+        key="Name"
+        value="oversec_net2_private"
+    }
+}
+
+#Création Service internet
+resource "outscale_internet_service" "oversec_net2_www" {
+	tags {
+	key="Name"
+	value="oversec_net2_www"
+  }
+}
+
+#Attachement duu service internet au Net
+resource "outscale_internet_service_link" "oversec_net2_www_link" {
+  internet_service_id = outscale_internet_service.oversec_net2_www.internet_service_id
+  net_id = outscale_net.oversec_net2_net.net_id
+  
+}
+
+
+# Création table de routage subnet public
+resource "outscale_route_table" "oversec_net2_sn1_rt" {
+  net_id = outscale_net.oversec_net2_net.net_id
+  tags {
+    key="Name"
+    value="oversec_net2_sn1_rt_public"
+  }
+}
+#Création route par défaut vers service internet
+resource "outscale_route" "oversec_net2_rt_def" {
+  destination_ip_range = "0.0.0.0/0"
+  route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
+  gateway_id = outscale_nat_service.oversec_net2_nat.nat_service_id
+  depends_on = [
+    terraform_data.oversec_net2_www_link
+  ]
+}
+#Attachement table de routage à subnet public
+resource "outscale_route_table_link" "oversec_net2_rtl" {
+    subnet_id      = outscale_subnet.oversec_net2_sn1.subnet_id
+    route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
+}
+
+
+#IP PUBLIQUE pour nat gateway
+resource "outscale_public_ip" "oversec_ip_net2_nat"{
+	tags {
+	key="Name"
+	value="oversec_ip_net2_nat"
+  }
+    depends_on = [
+    terraform_data.oversec_net2_www_link
+  ]
+}
+
+
+#NAT GATEWAY
+resource "outscale_nat_service" "oversec_net2_nat" {
+  subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
+  public_ip_id = outscale_public_ip.oversec_ip_net2_nat.public_ip_id
+}
+
+#Table de routage
+resource "outscale_route_table" "oversec_net2_sn2_rt" {
+  net_id = outscale_net.oversec_net2_net.net_id
+  tags {
+    key="Name"
+    value="oversec_net2_sn1_rt_private"
+  }
+}
+
+#Route par défaut
+resource "outscale_route" "oversec_net2_rt_def_priv" {
+  destination_ip_range = "0.0.0.0/0"
+  route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
+  gateway_id = outscale_nat_service.oversec_net2_nat.nat_service_id
+}
+
+#Attachement route table à subnet private
+resource "outscale_route_table_link" "oversec_net2_priv_rtl" {
+    subnet_id      = outscale_subnet.oversec_net2_sn2.subnet_id
+    route_table_id = outscale_route_table.oversec_net2_sn2_rt.route_table_id
+}
 
 #############################################################################################################################
 #
-# VM  NET 3 : Private
+# NET 3 SIte de production déconnecté
 #
-#############################################################################################################################
+##############################################################################################################################
 
-resource "outscale_vm" "oversec_net3_sn1_vm1" {
-    image_id                =  tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav6.c1r2p2" 
-    keypair_name             = local.keypair_name
-    subnet_id = outscale_subnet.oversec_net3_sn1.subnet_id
-    security_group_ids = [outscale_security_group.oversec_net3_sn1_sg.security_group_id]
+resource "outscale_net" "oversec_net3_net" {
+    ip_range = "10.3.0.0/16"
     tags {
-        key   = "Name"
-        value = "oversec_net3-sn1_private"
+        key="Name"
+        value="oversec_net3_net_Private"
     }
-    user_data                = base64encode(<<EOF
-    <CONFIGURATION>
-    EOF
-    )
-    depends_on = [
-      data.outscale_images.oversec
-    ] 
 }
+
+resource "outscale_subnet" "oversec_net3_sn1" {
+    net_id = outscale_net.oversec_net3_net.net_id
+    ip_range = "10.3.1.0/24"
+    tags {
+        key="Name"
+        value="oversec_net3_sn1_private"
+    }
+}
+
+#Table de routage
+resource "outscale_route_table" "oversec_net3_sn1_rt" {
+  net_id = outscale_net.oversec_net3_net.net_id
+  tags {
+    key="Name"
+    value="oversec_net3_sn1_rt_private"
+  }
+}
+
+

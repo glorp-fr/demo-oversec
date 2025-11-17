@@ -1,10 +1,7 @@
-
-
 locals {
   trigger = join("-", ["JTT", formatdate("YYYYMMDDhhmmss", timestamp())])
-  packer_init = terraform_data.packer_init.output
-  omi_delete = terraform_data.packer_build_oversec.output
   keypair_name = "kp-oversec"
+  # Variables supprimées car non nécessaires avec l'approche conditionnelle
 }
 
 
@@ -29,6 +26,7 @@ resource "outscale_keypair" "kp-oversec" {
   keypair_name = "kp-oversec"
   public_key = tls_private_key.kp-oversec.public_key_openssh
 }
+
 
 #############################################################################################################################
 #
@@ -74,7 +72,7 @@ resource "terraform_data" "packer_init_oversec" {
 
 resource "terraform_data" "packer_build_oversec" {
   count = local.oversec_image_exists ? 0 : 1
-  input = local.oversec_image_exists ? null : terraform_data.packer_init_oversec[0].output
+  input = length(terraform_data.packer_init_oversec) > 0 ? terraform_data.packer_init_oversec[0].output : null
   
   provisioner "local-exec" {
     working_dir = "./"
@@ -116,7 +114,7 @@ resource "terraform_data" "packer_init_http" {
 
 resource "terraform_data" "packer_build_http" {
   count = local.http_image_exists ? 0 : 1
-  input = local.http_image_exists ? null : terraform_data.packer_init_http[0].output
+  input = length(terraform_data.packer_init_http) > 0 ? terraform_data.packer_init_http[0].output : null
   
   provisioner "local-exec" {
     working_dir = "./"
@@ -140,19 +138,13 @@ data "outscale_images" "http" {
 }
 
 
-
-
-
 #############################################################################################################################
 #
 # VM NET1 = Client Oversec
 #
 #############################################################################################################################
 
- 
-
 resource "outscale_vm" "oversec_net1_sn1_vm1" {
-    #image_id                = "ami-8be8ac39"
     image_id                 = tolist(data.outscale_images.oversec.images)[0].image_id
     vm_type                  = "tinav6.c1r2p2" 
     keypair_name             = local.keypair_name
@@ -167,7 +159,7 @@ resource "outscale_vm" "oversec_net1_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build_oversec
+      data.outscale_images.oversec
     ] 
 }
 
@@ -184,17 +176,13 @@ resource "outscale_public_ip_link" "oversec_net1_sn1_vm1_ipl" {
 }
 
 
-
-
 #############################################################################################################################
 #
 # VMs  NET 2 = Oversec Relay
 #
 #############################################################################################################################
 
-
 resource "outscale_vm" "oversec_net2_sn1_vm1" {
-    #image_id                 = "ami-8be8ac39"
     image_id                = tolist(data.outscale_images.oversec.images)[0].image_id
     vm_type                  = "tinav6.c1r2p2"
     keypair_name             = local.keypair_name
@@ -209,12 +197,11 @@ resource "outscale_vm" "oversec_net2_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build_oversec
+      data.outscale_images.oversec
     ] 
 }
 
 resource "outscale_vm" "oversec_net2_sn2_vm2" {
-    #image_id                 = "ami-8be8ac39"
     image_id                =  tolist(data.outscale_images.http.images)[0].image_id
     vm_type                  = "tinav6.c1r1p2" 
     keypair_name             = local.keypair_name
@@ -229,10 +216,9 @@ resource "outscale_vm" "oversec_net2_sn2_vm2" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build_http
+      data.outscale_images.http
     ] 
 }
-
 
 
 #############################################################################################################################
@@ -256,8 +242,6 @@ resource "outscale_vm" "oversec_net3_sn1_vm1" {
     EOF
     )
     depends_on = [
-    terraform_data.packer_build_http
+      data.outscale_images.oversec
     ] 
 }
-
-
