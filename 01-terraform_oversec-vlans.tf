@@ -114,7 +114,7 @@ resource "outscale_internet_service" "oversec_net2_www" {
   }
 }
 
-#Attachement duu service internet au Net
+#Attachement du service internet au Net
 resource "outscale_internet_service_link" "oversec_net2_www_link" {
   internet_service_id = outscale_internet_service.oversec_net2_www.internet_service_id
   net_id = outscale_net.oversec_net2_net.net_id
@@ -130,17 +130,29 @@ resource "outscale_route_table" "oversec_net2_sn1_rt" {
     value="oversec_net2_sn1_rt_public"
   }
 }
+
+
 #Création route par défaut vers service internet
 resource "outscale_route" "oversec_net2_rt_def" {
   destination_ip_range = "0.0.0.0/0"
   route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
-  gateway_id = outscale_nat_service.oversec_net2_nat.nat_service_id
+  gateway_id = outscale_nat_service.oversec_net2_www.internet_service_id
 }
+
+
 #Attachement table de routage à subnet public
 resource "outscale_route_table_link" "oversec_net2_rtl" {
     subnet_id      = outscale_subnet.oversec_net2_sn1.subnet_id
     route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
 }
+
+
+##############################################################################################################################
+#
+# NAT GATEWAY
+#
+##############################################################################################################################
+
 
 
 #IP PUBLIQUE pour nat gateway
@@ -157,12 +169,11 @@ resource "outscale_nat_service" "oversec_net2_nat" {
   subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
   public_ip_id = outscale_public_ip.oversec_ip_net2_nat.public_ip_id
   depends_on = [
-    outscale_route_table_link.oversec_net2_rtl,
-    outscale_internet_service_link.oversec_net2_www_link
+    depends_on   = outscale_route.oversec_net2_rt_def
   ]
 }
 
-#Table de routage
+#Table de routage NET2 Subnet 2
 resource "outscale_route_table" "oversec_net2_sn2_rt" {
   net_id = outscale_net.oversec_net2_net.net_id
   tags {
@@ -174,11 +185,11 @@ resource "outscale_route_table" "oversec_net2_sn2_rt" {
   ]
 }
 
-#Route par défaut
+#Route par défaut sn2
 resource "outscale_route" "oversec_net2_rt_def_priv" {
   destination_ip_range = "0.0.0.0/0"
   route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
-  gateway_id = outscale_nat_service.oversec_net2_nat.nat_service_id
+  nat_service_id = outscale_nat_service.oversec_net2_nat.nat_service_id
 }
 
 #Attachement route table à subnet private
