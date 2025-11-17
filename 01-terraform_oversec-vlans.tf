@@ -169,6 +169,9 @@ resource "outscale_route_table" "oversec_net2_sn2_rt" {
     key="Name"
     value="oversec_net2_sn1_rt_private"
   }
+  depends_on = [
+    outscale_nat_service.oversec_net2_nat
+  ]
 }
 
 #Route par défaut
