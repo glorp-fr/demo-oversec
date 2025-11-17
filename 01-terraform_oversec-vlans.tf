@@ -188,7 +188,7 @@ resource "outscale_route_table" "oversec_net2_sn2_rt" {
 #Route par défaut sn2
 resource "outscale_route" "oversec_net2_rt_def_priv" {
   destination_ip_range = "0.0.0.0/0"
-  route_table_id = outscale_route_table.oversec_net2_sn1_rt.route_table_id
+  route_table_id = outscale_route_table.oversec_net2_sn2_rt.route_table_id
   nat_service_id = outscale_nat_service.oversec_net2_nat.nat_service_id
 }
 
