@@ -33,7 +33,7 @@ resource "outscale_keypair" "kp-oversec" {
 
 #############################################################################################################################
 #
-# Lancement de Packer
+# Lancement de Packer Oversec
 #
 #############################################################################################################################
 
@@ -43,12 +43,12 @@ resource "terraform_data" "packer_init" {
 
   provisioner "local-exec" {
     working_dir = "./"
-    command = "packer init vm_debian12_Jaouen.pkr.hcl" 
+    command = "packer init vm_oversec.pkr.hcl" 
   }
 }
 
 
-resource "terraform_data" "packer_build" {
+resource "terraform_data" "packer_build_oversec" {
   input = local.packer_init
   
   provisioner "local-exec" {
@@ -58,7 +58,7 @@ resource "terraform_data" "packer_build" {
     OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
 
     }
-    command = "packer build vm_debian12_Jaouen.pkr.hcl" 
+    command = "packer build vm_oversec.pkr.hcl" 
   
   }
 }
@@ -70,19 +70,61 @@ data "outscale_images" "oversec" {
    values = ["*oversec*"]
   }
   depends_on = [
-    terraform_data.packer_build
+    terraform_data.packer_build_oversec
+  ]
+}
+
+
+
+#############################################################################################################################
+#
+# Lancement de Packer http
+#
+#############################################################################################################################
+
+
+resource "terraform_data" "packer_init_http" {
+  input =  local.trigger
+
+  provisioner "local-exec" {
+    working_dir = "./"
+    command = "packer init vm_http.pkr.hcl" 
+  }
+}
+
+
+resource "terraform_data" "packer_build_http" {
+  input = local.packer_init
+  
+  provisioner "local-exec" {
+    working_dir = "./"
+    environment = {
+    OUTSCALE_ACCESSKEYID = "${var.access_key_id}"
+    OUTSCALE_SECRETKEYID = "${var.secret_key_id}"
+
+    }
+    command = "packer build vm_http.pkr.hcl" 
+  
+  }
+}
+
+
+data "outscale_images" "http" {
+  filter {
+   name = "image_names"
+   values = ["*http*"]
+  }
+  depends_on = [
+    terraform_data.packer_build_http
   ]
 }
 
 
 
 
-
-
-
 #############################################################################################################################
 #
-# VM BASTION
+# VM NET1 = Client Oversec
 #
 #############################################################################################################################
 
@@ -91,7 +133,7 @@ data "outscale_images" "oversec" {
 resource "outscale_vm" "oversec_net1_sn1_vm1" {
     #image_id                = "ami-8be8ac39"
     image_id                 = tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav6.c4r4p2" 
+    vm_type                  = "tinav6.c1r2p2" 
     keypair_name             = local.keypair_name
     subnet_id = outscale_subnet.oversec_net1_sn1.subnet_id
     security_group_ids = [outscale_security_group.oversec_net1_sn1_sg.security_group_id]
@@ -125,7 +167,7 @@ resource "outscale_public_ip_link" "oversec_net1_sn1_vm1_ipl" {
 
 #############################################################################################################################
 #
-# VMs  NET 2
+# VMs  NET 2 = Oversec Relay
 #
 #############################################################################################################################
 
@@ -133,13 +175,13 @@ resource "outscale_public_ip_link" "oversec_net1_sn1_vm1_ipl" {
 resource "outscale_vm" "oversec_net2_sn1_vm1" {
     #image_id                 = "ami-8be8ac39"
     image_id                = tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav5.c4r4p2" 
+    vm_type                  = "tinav6.c1r2p2"
     keypair_name             = local.keypair_name
     subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
     security_group_ids = [outscale_security_group.oversec_net2_sn1_sg.security_group_id]
     tags {
         key   = "Name"
-        value = "oversec_net2-sn1_vm1"
+        value = "oversec_net2-sn1_Relay"
     }
     user_data                = base64encode(<<EOF
     <CONFIGURATION>
@@ -150,16 +192,16 @@ resource "outscale_vm" "oversec_net2_sn1_vm1" {
     ] 
 }
 
-resource "outscale_vm" "oversec_net2_sn1_vm2" {
+resource "outscale_vm" "oversec_net2_sn2_vm2" {
     #image_id                 = "ami-8be8ac39"
-    image_id                =  tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav5.c1r1p2" 
+    image_id                =  tolist(data.outscale_images.http.images)[0].image_id
+    vm_type                  = "tinav6.c1r1p2" 
     keypair_name             = local.keypair_name
     subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
     security_group_ids = [outscale_security_group.oversec_net2_sn1_sg.security_group_id]
     tags {
         key   = "Name"
-        value = "oversec_net2-sn1_vm2"
+        value = "oversec_net2-sn1_http"
     }
     user_data                = base64encode(<<EOF
     <CONFIGURATION>
@@ -174,20 +216,19 @@ resource "outscale_vm" "oversec_net2_sn1_vm2" {
 
 #############################################################################################################################
 #
-# VM  NET 3
+# VM  NET 3 : Private
 #
 #############################################################################################################################
 
 resource "outscale_vm" "oversec_net3_sn1_vm1" {
-    #image_id                 = "ami-8be8ac39"
     image_id                =  tolist(data.outscale_images.oversec.images)[0].image_id
-    vm_type                  = "tinav5.c3r4p2" 
+    vm_type                  = "tinav6.c1r2p2" 
     keypair_name             = local.keypair_name
     subnet_id = outscale_subnet.oversec_net3_sn1.subnet_id
     security_group_ids = [outscale_security_group.oversec_net3_sn1_sg.security_group_id]
     tags {
         key   = "Name"
-        value = "oversec_net3-sn1_vm1"
+        value = "oversec_net3-sn1_private"
     }
     user_data                = base64encode(<<EOF
     <CONFIGURATION>
@@ -199,14 +240,3 @@ resource "outscale_vm" "oversec_net3_sn1_vm1" {
 }
 
 
-#resource "terraform_data" "omi_delete" {
-#  input =  local.trigger
-
-#  provisioner "local-exec" {
-#    working_dir = "./"
-#    command = "curl https://fcu.${var.region}.outscale.com --user ${var.access_key_id}:${var.secret_key_id} --aws-sigv4 'aws:amz' --data-urlencode 'Version=2016-09-15' --data-urlencode 'Action=DeregisterImage' --data-urlencode 'ImageId=${tolist(data.outscale_images.oversec.images)[0].image_id}'"
-#  }
-#    depends_on = [
-#    outscale_vm.oversec_net3_sn1_vm1
-#    ] 
-#}
