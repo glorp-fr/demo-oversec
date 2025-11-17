@@ -156,6 +156,10 @@ resource "outscale_public_ip" "oversec_ip_net2_nat"{
 resource "outscale_nat_service" "oversec_net2_nat" {
   subnet_id = outscale_subnet.oversec_net2_sn1.subnet_id
   public_ip_id = outscale_public_ip.oversec_ip_net2_nat.public_ip_id
+  depends_on = [
+    outscale_route_table_link.oversec_net2_rtl,
+    outscale_internet_service_link.oversec_net2_www_link
+  ]
 }
 
 #Table de routage
