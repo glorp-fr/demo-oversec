@@ -30,7 +30,7 @@ resource "outscale_security_group_rule" "oversec_net1_sn1_icmp_in" {
 	ip_protocol = "icmp"
 	ip_range = "10.0.0.0/8"
 }
-resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in" {
+resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in_wojo" {
 	flow = "Inbound"
 	security_group_id = outscale_security_group.oversec_net2_sn1_sg.security_group_id
 	from_port_range = "22"
@@ -80,7 +80,7 @@ resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in" {
 	ip_protocol = "tcp"
 	ip_range = "10.1.0.0/16"
 }
-resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in" {
+resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in_wojo" {
 	flow = "Inbound"
 	security_group_id = outscale_security_group.oversec_net2_sn1_sg.security_group_id
 	from_port_range = "22"
