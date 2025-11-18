@@ -184,6 +184,18 @@ resource "outscale_vm" "oversec_net2_sn1_vm1" {
     ] 
 }
 
+resource "outscale_public_ip" "oversec_net2_sn1_vm1_ip"{
+	tags {
+	key="Name"
+	value="oversec_net2_sn1_vm1_ip"
+  }
+}
+
+resource "outscale_public_ip_link" "oversec_net2_sn1_vm1_ipl" {
+    vm_id     = outscale_vm.oversec_net2_sn1_vm1.vm_id
+    public_ip = outscale_public_ip.oversec_net2_sn1_vm1_ip.public_ip
+}
+
 #############################################################################################################################
 #
 # VMs  NET 2 = http server
