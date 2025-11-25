@@ -88,7 +88,14 @@ resource "outscale_security_group_rule" "oversec_net2_sn1_ssh_in_wojo" {
 	ip_protocol = "tcp"
 	ip_range = "185.64.148.140/32"
 }
-
+resource "outscale_security_group_rule" "oversec_net2_sn1_ssh2_in_wojo" {
+	flow = "Inbound"
+	security_group_id = outscale_security_group.oversec_net2_sn1_sg.security_group_id
+	from_port_range = "222"
+	to_port_range = "222"
+	ip_protocol = "tcp"
+	ip_range = "185.64.148.140/32"
+}
 
 ##############################################################################################################
 #Security Group Net2 Vlan2 
